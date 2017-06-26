@@ -1,10 +1,5 @@
 # from __future__ import print_function
 
-'''
-This script is almost the same as standard example from Theano.
-Here, we use the standard way to pretrain the model, there is no point to change the code anyway.
-'''
-
 __author__ = 'Haohan Wang'
 
 import sys
@@ -135,7 +130,7 @@ class LeNetConvPoolLayer(object):
 def evaluate_lenet5(learning_rate=1e-7, n_epochs=200, batch_size=50, l1=0., l2=0.0, dropout=0.0):
     rng = numpy.random.RandomState(0)
 
-    datasets = load_data_pretrain('text')
+    datasets = load_data_pretrain('video')
 
     train_set_x, train_set_y = datasets[0]
     valid_set_x, valid_set_y = datasets[1]
@@ -162,23 +157,23 @@ def evaluate_lenet5(learning_rate=1e-7, n_epochs=200, batch_size=50, l1=0., l2=0
     ######################
     print '... building the model'
 
-    layer0_input = x.reshape((batch_size, 1, 60, 300))
+    layer0_input = x.reshape((batch_size, 1, 5, 415))
 
     layer0 = LeNetConvPoolLayer(
         rng,
         input=layer0_input,
-        image_shape=(batch_size, 1, 60, 300),
-        filter_shape=(25, 1, 3, 3),
-        poolsize=(2, 2),
+        image_shape=(batch_size, 1, 5, 415),
+        filter_shape=(25, 1, 5, 80),
+        poolsize=(1, 4),
         activation=activation_cnn
     )
 
     layer1 = LeNetConvPoolLayer(
         rng,
         input=layer0.output,
-        image_shape=(batch_size, 25, 29, 149),
-        filter_shape=(50, 25, 2, 2),
-        poolsize=(2, 2),
+        image_shape=(batch_size, 25, 1, 84),
+        filter_shape=(50, 25, 1, 40),
+        poolsize=(1, 5),
         activation=activation_cnn
     )
 
@@ -187,8 +182,8 @@ def evaluate_lenet5(learning_rate=1e-7, n_epochs=200, batch_size=50, l1=0., l2=0
     # construct a fully-connected sigmoidal layer
     layer2 = DropoutHiddenLayer(
         rng,
-        n_in=50 * 14 * 74,
-        n_out=200,
+        n_in=50 * 1*9,
+        n_out=80,
         activation=activation,
         dropout_rate=dropout
     )
@@ -196,19 +191,16 @@ def evaluate_lenet5(learning_rate=1e-7, n_epochs=200, batch_size=50, l1=0., l2=0
     layer2output = layer2.output(layer2_input)
 
     # classify the values of the fully-connected sigmoidal layer
-    layer3 = LogisticRegression(input=layer2output, n_in=200, n_out=2)
+    layer3 = LogisticRegression(input=layer2output, n_in=80, n_out=2)
 
-    # the cost we minimize during training is the NLL of the model
-    L1 = (  (abs(layer2.W).sum()
-            + abs(layer2.b).sum() )* 0
-            + (abs(layer3.W).sum()
-            + abs(layer3.b).sum()) * 0 )
+    L1 = abs(layer1.W).sum() \
+            + abs(layer1.b).sum()
 
 
     L2 = (layer3.W**2).sum() \
             + (layer3.b**2).sum()
 
-    cost = layer3.negative_log_likelihood(y) + L1 + l2*L2
+    cost = layer3.negative_log_likelihood(y) + l1*L1 + l2*L2
 
     # create a function to compute the mistakes that are made by the model
     test_model = theano.function(
@@ -231,7 +223,6 @@ def evaluate_lenet5(learning_rate=1e-7, n_epochs=200, batch_size=50, l1=0., l2=0
 
     # create a list of all model parameters to be fit by gradient descent
     params = layer3.params + layer2.params + layer1.params + layer0.params
-    # params = layer3.params + layer2.params + layer0.params
 
     updates = opt(cost, params, learning_rate)
 
@@ -294,8 +285,7 @@ def evaluate_lenet5(learning_rate=1e-7, n_epochs=200, batch_size=50, l1=0., l2=0
 
                 if this_validation_loss < best_validation_loss:
                     l = [p.get_value(True) for p in params]
-                    numpy.save('../params/pretrainMOSISelf/textModelParams', l)
-                    # improve patience if loss improvement is good enough
+                    numpy.save('../params/pretrain/videoModelParams', l)
                     if this_validation_loss < best_validation_loss * \
                             improvement_threshold:
                         patience = max(patience, iter * patience_increase)
@@ -325,4 +315,4 @@ def evaluate_lenet5(learning_rate=1e-7, n_epochs=200, batch_size=50, l1=0., l2=0
 
 
 if __name__ == '__main__':
-    evaluate_lenet5(learning_rate=5e-4, n_epochs=5000, batch_size=50, l2=0, dropout=0)
+    evaluate_lenet5(learning_rate=5e-4, n_epochs=5000, batch_size=15, l1=0.0, l2=0., dropout=0)

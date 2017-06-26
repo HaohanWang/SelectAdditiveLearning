@@ -26,19 +26,19 @@ if __name__ == '__main__':
     n_epochs = 5
 
     batch_size = 15
-    learning_rate = 5e-7
+    learning_rate = 5e-6
     lamda = 0
     dropout1 = 0
-    dropout2 = 0.5
+    dropout2 = 0.99
     ylam = 0
 
-    imageShapeText = ((batch_size, 1, 66, 306),(batch_size, 25, 66, 152))
-    filterShapeText = ((25,1,1,3),(50, 25, 3, 3))
-    poolSizeText = ((1,2),(2,2))
-    dropOutSizeText = ((50 * 32*75, 500),)
+    imageShapeText = ((batch_size, 1, 5, 415),(batch_size, 25, 5, 103))
+    filterShapeText = ((25,1,1,4),(50, 25, 1, 4))
+    poolSizeText = ((1,4),(1,4))
+    dropOutSizeText = ((50 * 5 * 25, 500),)
 
     # Loading Features
-    datasets = load_data_test('text', t='MOUD')
+    datasets = load_data_test('video', t='MOUD')
 
     train_set_x, train_set_y = datasets[0]
     valid_set_x, valid_set_y = datasets[1]
@@ -59,7 +59,7 @@ if __name__ == '__main__':
                      b1 = 0.1, b2=0.01,
              batch_size=batch_size, learning_rate=learning_rate, lam=lamda, dropOutRate1=dropout1, dropOutRate2=dropout2, yLam=ylam)
 
-    model.load_parameters('../params/pretrain/textModelParams.npy')
+    model.load_parameters('../params/pretrain/videoModelParams.npy')
 
     cvCount += 1
     batch_order = np.arange(int(model.N / model.batch_size))
@@ -127,7 +127,7 @@ if __name__ == '__main__':
             if validerror < bestError:
                 bestError = validerror
                 best_params = model.get_parameters()
-                np.save('../params/mix/MOUD/textModelParams', best_params)
+                np.save('../params/mix/MOUD/videoModelParams', best_params)
                 print 'NEW Best!',
                 error = []
                 for mbatch2 in test_batch_order2:
@@ -136,4 +136,3 @@ if __name__ == '__main__':
                 print 'test error', bestTestError
 
     print 'best test model', bestTestError, 'with validation error', bestError
-

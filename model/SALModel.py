@@ -217,7 +217,7 @@ class SALModel:
         eps = srng.normal(mu.shape)
 
         # Reparametrize
-        z = mu +  (T.exp(0.5 * log_sigma) - 1) * eps * 1e2
+        z = mu +  (T.exp(0.5 * log_sigma) - 1) * eps * 1e1
 
         return z
 
@@ -299,7 +299,8 @@ class SALModel:
 
         # for random part
         mu_rand, log_sigma_rand = self.encoder_rand(m, b)
-        o_rand = self.sampler_rand(n, log_sigma_rand)
+        n_rand = self.dropOutOutput(m)
+        o_rand = self.sampler_rand(n_rand, log_sigma_rand)
 
         y_pred_rand, nll_rand, error_rand = self.logisticOutput(o_rand, y)
 
@@ -313,9 +314,9 @@ class SALModel:
         L1_upper = (T.mean(np.abs(self.params['W_yh'])) + T.mean(np.abs(self.params['b_yh']))) * self.ylam
 
         # cost_random = T.cast(-T.mean(T.log(p_y_given_x)[T.arange(y.shape[0]), np.abs(1-y)]), T.config.floatX)
-        cost_random = nll_rand #+ L1_rand
+        cost_random = nll_rand + L1_rand
 
-        cost = nll + L1_upper
+        cost = nll #+ L1_middle
 
         # Expectation of (logpz - logqz_x) over logqz_x is equal to KLD (see appendix B):
         # KLD = 0.5 * T.sum(1 + log_sigma - mu**2 - T.exp(log_sigma), axis=1, keepdims=True)
