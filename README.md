@@ -1,7 +1,7 @@
 # Select Additive Learning
 Implementation for the paper [Select-Additive Learning: Improving Generalization in Multimodal Sentiment Analysis](https://arxiv.org/abs/1609.05244)
 
-Extracted features used for the paper is here: [Multimodal Sentiment Analysis data set](https://www.kaggle.com/wanghaohan/multimodal-sentiment-analysis). 
+Extracted features used for the paper is here: [Multimodal Sentiment Analysis data set](http://www.cs.cmu.edu/~haohanw/SAL/). 
 
 Examples are showed with Verbal Modality
 
