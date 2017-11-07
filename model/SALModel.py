@@ -38,12 +38,10 @@ activation_cnn = tanh
 activation_output = T.nnet.softmax
 
 optimize = Optimizer()
-opt = optimize.sgd
+opt = optimize.adagrad
 
 
 class SALModel:
-    """This class implements the Variational Auto Encoder"""
-
     def __init__(self, continuous, n_class,
                  filterShapeText, poolSizeText, imageShapeText, dropOutSizeText,
                  x_train_fix, y_train, groupId,  x_valid_fix, y_valid, groupId_valid, x_test_fix, y_test,
@@ -111,8 +109,8 @@ class SALModel:
         )
         b_fh1 = theano.shared(create_bias((filterShapeText[1][0],)), name='b_th1')
 
-        W_rh = theano.shared(create_weight(self.groupIDsize, dropOutSizeText[0][1]), name='W_hsigma')
-        b_rh = theano.shared(create_bias(dropOutSizeText[0][1]), name='b_hsigma')
+        W_rh = theano.shared(create_weight(self.groupIDsize, dropOutSizeText[0][0]), name='W_hsigma')
+        b_rh = theano.shared(create_bias(dropOutSizeText[0][0]), name='b_hsigma')
 
         # Combines Features Dropout Layer
         W_ch = theano.shared(create_weight(dropOutSizeText[0][0], dropOutSizeText[0][1]), name='W_th2')
@@ -129,7 +127,7 @@ class SALModel:
 
         self.params_fixed = OrderedDict([
                                    #("W_fh0", W_fh0), ("b_fh0", b_fh0), ("W_fh1", W_fh1), ("b_fh1", b_fh1),
-                                   #("W_ch", W_ch), ("b_ch", b_ch),
+                                   ("W_ch", W_ch), ("b_ch", b_ch),
                                    ("W_yh", W_yh), ("b_yh", b_yh)])
 
         self.params_random = OrderedDict([("W_rh", W_rh), ("b_rh", b_rh),
@@ -154,7 +152,7 @@ class SALModel:
         x_test_fix = theano.shared(x_test_fix.astype(theano.config.floatX), name="x_test_fix")
         y_test = T.cast(y_test, 'int32')
 
-        self.update, self.test, self.predict, self.update_fixed, self.update_random, self.valid_random, self.update_random_params \
+        self.update, self.test, self.predict, self.update_fixed, self.update_random, self.valid_random, self.update_random_params, self.update_match \
             = self.create_gradientfunctions(x_train_fix, y_train, groupId,x_valid_fix, y_valid, groupId_valid,
                                                                              x_test_fix, y_test)
 
@@ -217,7 +215,7 @@ class SALModel:
         eps = srng.normal(mu.shape)
 
         # Reparametrize
-        z = mu +  (T.exp(0.5 * log_sigma) - 1) * eps * 1e1
+        z = mu +  (T.exp(0.5 * log_sigma) - 1) * eps * 5e-1
 
         return z
 
@@ -290,33 +288,39 @@ class SALModel:
 
         mu, log_sigma = self.encoder(m, b)
 
-        n = self.dropOutOutput(m)
+        n = self.sampler(m, log_sigma)
 
-        o = self.sampler(n, log_sigma)
+        o = self.dropOutOutput(n)
 
         # as a classifier
         y_pred, nll, error = self.logisticOutput(o, y)
 
         # for random part
         mu_rand, log_sigma_rand = self.encoder_rand(m, b)
-        n_rand = self.dropOutOutput(m)
-        o_rand = self.sampler_rand(n_rand, log_sigma_rand)
+        n_rand = self.sampler_rand(m, log_sigma_rand)
+        o_rand = self.dropOutOutput(n_rand)
 
         y_pred_rand, nll_rand, error_rand = self.logisticOutput(o_rand, y)
 
-        L1_lower = (T.mean(np.abs(self.params['W_fh0'])) + T.mean(np.abs(self.params['b_fh0'])) + T.mean(
+        L1_lower = (T.sum(np.abs(self.params['W_fh0'])) + T.sum(np.abs(self.params['b_fh0'])) + T.mean(
             np.abs(self.params['W_fh1'])) + T.mean(np.abs(self.params['b_fh1']))) * self.ylam
 
-        L1_middle = (T.mean(np.abs(self.params['W_ch'])) + T.mean(np.abs(self.params['b_ch']))) * self.ylam
+        L1_middle = (T.sum(np.abs(self.params['W_ch'])) + T.sum(np.abs(self.params['b_ch']))) * self.ylam
 
-        L1_rand = (T.mean(np.abs(self.params['W_rh'])) + T.mean(np.abs(self.params['b_rh']))) * self.ylam
+        L1_rand = (T.sum(np.abs(self.params['W_rh'])) + T.sum(np.abs(self.params['b_rh']))) * 1e-3
 
-        L1_upper = (T.mean(np.abs(self.params['W_yh'])) + T.mean(np.abs(self.params['b_yh']))) * self.ylam
+        L1_rand_output =  (T.sum(np.abs(n_rand))) * 0 #1e3
+
+        L1_upper = (T.sum(np.abs(self.params['W_yh'])) + T.sum(np.abs(self.params['b_yh']))) * self.ylam
 
         # cost_random = T.cast(-T.mean(T.log(p_y_given_x)[T.arange(y.shape[0]), np.abs(1-y)]), T.config.floatX)
-        cost_random = nll_rand + L1_rand
+        cost_random = nll_rand + L1_rand + L1_rand_output
 
-        cost = nll #+ L1_middle
+        cost = nll + L1_middle + L1_upper
+
+        error_match = T.cast(T.mean(np.abs(m - n_rand)), T.config.floatX)
+
+        cost_match = error_match + L1_rand + L1_rand_output
 
         # Expectation of (logpz - logqz_x) over logqz_x is equal to KLD (see appendix B):
         # KLD = 0.5 * T.sum(1 + log_sigma - mu**2 - T.exp(log_sigma), axis=1, keepdims=True)
@@ -327,7 +331,8 @@ class SALModel:
         updates = opt(cost, self.params, self.learning_rate)
 
         updates_fixed = opt(cost, self.params_fixed, self.learning_rate)
-        updates_random = opt(cost_random, self.params_random, self.learning_rate)
+        updates_random = opt(cost_random, self.params_random, 1)
+        updates_match = opt(cost_match, self.params_random, 5e0)
 
         givens = {
             t: x_train_fix[batch * self.batch_size:(batch + 1) * self.batch_size, :],
@@ -350,6 +355,11 @@ class SALModel:
         givens_random = {
             t: x_trainFakeRandom[batch * self.batch_size:(batch + 1) * self.batch_size, :],
             y: y_train[batch * self.batch_size:(batch + 1) * self.batch_size],
+            b: groupId[batch * self.batch_size:(batch + 1) * self.batch_size, :],
+        }
+
+        givens_match = {
+            t: x_train_fix[batch * self.batch_size:(batch + 1) * self.batch_size, :],
             b: groupId[batch * self.batch_size:(batch + 1) * self.batch_size, :],
         }
 
@@ -384,6 +394,7 @@ class SALModel:
         update = theano.function([batch], cost, updates=updates, givens=givens)
         update_fixed = theano.function([batch], cost, updates=updates_fixed, givens=givens)
         update_random = theano.function([batch], error_rand, updates=updates_random, givens=givens_random)
+        update_match = theano.function([batch], cost_match, updates=updates_match, givens=givens_match)
         # likelihood = theano.function([x], logpx)
         # encode = theano.function([x], z)
         # decode = theano.function([z], reconstructed_x)
@@ -391,11 +402,11 @@ class SALModel:
 
         predict = theano.function([batch], error, givens=givens3)
 
-        valid_random = theano.function([batch], error_rand, givens=givens_random2)
+        valid_random = theano.function([batch], error_match, givens=givens_random2)
 
         update_random_params = theano.function(inputs=[wr, br], updates=[(self.params['W_rh'], wr), (self.params['b_rh'], br)])
 
-        return update, test, predict, update_fixed, update_random, valid_random, update_random_params
+        return update, test, predict, update_fixed, update_random, valid_random, update_random_params, update_match
 
     def load_parameters(self, path):
         """Load the variables in a shared variable safe way"""

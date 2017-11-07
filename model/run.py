@@ -6,7 +6,7 @@ sys.path.append('../')
 import numpy as np
 import theano
 
-from utility.dataLoader import load_data_test
+from utility.dataLoader import load_data_self_predict
 
 from SALModel import SALModel
 from theano import config
@@ -23,22 +23,22 @@ if __name__ == '__main__':
     print config.floatX
 
     # training configuration
-    n_epochs = 5
+    n_epochs = 1
 
-    batch_size = 15
-    learning_rate = 5e-6
+    batch_size = 50
+    learning_rate = 1e-3
     lamda = 0
     dropout1 = 0
-    dropout2 = 0.99
-    ylam = 0
+    dropout2 = 0
+    ylam = 1e-3
 
-    imageShapeText = ((batch_size, 1, 5, 415),(batch_size, 25, 5, 103))
-    filterShapeText = ((25,1,1,4),(50, 25, 1, 4))
-    poolSizeText = ((1,4),(1,4))
-    dropOutSizeText = ((50 * 5 * 25, 500),)
+    imageShapeText = ((batch_size, 1, 60, 300),(batch_size, 25, 29, 149))
+    filterShapeText = ((25,1,3,3),(50, 25, 2, 2))
+    poolSizeText = ((2,2),(2,2))
+    dropOutSizeText = ((50 * 14 * 74, 200),)
 
     # Loading Features
-    datasets = load_data_test('video', t='MOUD')
+    datasets = load_data_self_predict('text')
 
     train_set_x, train_set_y = datasets[0]
     valid_set_x, valid_set_y = datasets[1]
@@ -59,12 +59,12 @@ if __name__ == '__main__':
                      b1 = 0.1, b2=0.01,
              batch_size=batch_size, learning_rate=learning_rate, lam=lamda, dropOutRate1=dropout1, dropOutRate2=dropout2, yLam=ylam)
 
-    model.load_parameters('../params/pretrain/videoModelParams.npy')
+    model.load_parameters('../params/textModelParams.npy')
 
     cvCount += 1
     batch_order = np.arange(int(model.N / model.batch_size))
-    test_batch_order = np.arange(int(596 / model.batch_size))
-    test_batch_order2 = np.arange(int(450 / model.batch_size))
+    test_batch_order = np.arange(int(valid_set_y.shape[0] / model.batch_size))
+    test_batch_order2 = np.arange(int(test_set_y.shape[0] / model.batch_size))
     epoch = 0
     # print 'set ', count
     bestError = np.inf
@@ -103,7 +103,7 @@ if __name__ == '__main__':
         print 'fixed effects only tuning:',
         mini_f_m = []
         miniepoch = 0
-        while miniepoch < 100:
+        while miniepoch < 50:
             mini_f = []
             for batch in batch_order:
                 error_mini_f = model.update_fixed(batch)
@@ -127,7 +127,7 @@ if __name__ == '__main__':
             if validerror < bestError:
                 bestError = validerror
                 best_params = model.get_parameters()
-                np.save('../params/mix/MOUD/videoModelParams', best_params)
+                np.save('../params/textModelParams', best_params)
                 print 'NEW Best!',
                 error = []
                 for mbatch2 in test_batch_order2:

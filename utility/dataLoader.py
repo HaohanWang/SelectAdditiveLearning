@@ -118,3 +118,31 @@ def load_data_test(dataset='text', t='MOUD'):
     test_v = videoIDs[1200:,:]
 
     return train_set, valid_set, test_set, train_v, test_v
+
+def load_data_self_predict(dataset='text'):
+    path = '../data/'
+    if dataset == 'text':
+        data = np.load(path + 'MOSI/textFeatures.npy')
+    elif dataset == 'video':
+        data = np.load(path + 'MOSI/videoFeatures.npy')
+    else:
+        data = np.load(path + 'MOSI/audioFeatures.npy')
+    label = np.loadtxt(path + 'MOSI/labels.csv', delimiter=',').astype(int)
+
+    videoIDs = np.loadtxt(path + 'MOSI/videoIDs.csv', delimiter=',')
+
+    data1 = data[:1250,:]
+    label1 = label[:1250]
+    data2 = data[1250:,:]
+    label2 = label[1250:]
+
+    data1, label1, videoIDs = shuffleData(data1, label1, videoIDs)
+
+    train_set = (data1[:1000,:], label1[:1000])
+    valid_set = (data1[1000:1250,:], label1[1000:1250])
+
+    train_v = videoIDs[:1000,:]
+    test_v = videoIDs[1000:1250,:]
+
+    test_set = (data2, label2)
+    return train_set, valid_set, test_set, train_v, test_v
