@@ -5,6 +5,8 @@ Extracted features used for the paper is here: [Multimodal Sentiment Analysis da
 
 Examples are showed with Verbal Modality
 
+THEANO VERSION: 0.8.2
+
 The main method is at `model/run.py`
 
 Make sure you run `pretrainModel/model.py` before you run `model/run.py`. Then paremeters of the pre-trained model will be written into the file `params/pretrain/videoModelParams.npy` to be used by `model/run.py`.
