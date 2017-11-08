@@ -5,7 +5,7 @@ Extracted features used for the paper is here: [Multimodal Sentiment Analysis da
 
 Examples are showed with Verbal Modality
 
-THEANO VERSION: 0.8.2
+Theano version: 0.8.2
 
 The main method is at `model/run.py`
 
