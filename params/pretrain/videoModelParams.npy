@@ -1,1 +1,0 @@
-Make sure you run 'pretrainModel/model.py' before you run 'model/run.py'. Then paremeters of the pre-trained model will be written into the file 'params/pretrain/videoModelParams.npy' to be used by 'model/run.py'.
